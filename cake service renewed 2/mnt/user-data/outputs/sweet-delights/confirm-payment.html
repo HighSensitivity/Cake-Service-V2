@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout — Sweet Delights</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo"><h1>Sweet Delights</h1></div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <div class="cart-icon">
+        <a href="cart.html">
+          <i class="fas fa-shopping-bag"></i>
+          <span class="cart-count">0</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="confirm-layout" id="checkout-layout">
+
+      <!-- ORDER SUMMARY PANEL -->
+      <div class="order-summary-panel">
+        <h3><i class="fas fa-receipt" style="color:var(--rose);margin-right:0.5rem"></i>Order Summary</h3>
+        <div id="order-lines"></div>
+        <div class="order-grand-total">
+          <span>Total</span>
+          <span id="grand-total">$0</span>
+        </div>
+        <div id="delivery-note" style="font-size:0.8rem;color:var(--sage);margin-top:0.5rem;text-align:right;font-weight:600"></div>
+      </div>
+
+      <!-- CHECKOUT FORM PANEL -->
+      <div class="checkout-form-panel">
+        <h2>Complete Your Order</h2>
+
+        <div id="form-area">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="firstName">First Name</label>
+              <input type="text" id="firstName" placeholder="Jane" required>
+            </div>
+            <div class="form-group">
+              <label for="lastName">Last Name</label>
+              <input type="text" id="lastName" placeholder="Smith" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" placeholder="jane@example.com" required>
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" placeholder="(555) 000-0000">
+          </div>
+          <div class="form-group">
+            <label for="address">Delivery Address</label>
+            <input type="text" id="address" placeholder="123 Maple Street, City" required>
+          </div>
+          <div class="form-group">
+            <label for="notes">Special Instructions <span style="font-weight:400;opacity:0.6">(optional)</span></label>
+            <input type="text" id="notes" placeholder="e.g. Happy Birthday Sarah! on the cake">
+          </div>
+
+          <button class="confirm-btn" id="place-order-btn" onclick="placeOrder()">
+            <i class="fas fa-lock"></i> Place Order
+          </button>
+          <a href="cart.html" class="continue-link">← Back to Cart</a>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div class="loading-overlay" id="loading-state">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Placing your order…</p>
+        </div>
+
+        <!-- SUCCESS STATE -->
+        <div class="success-panel" id="success-state">
+          <i class="fas fa-check-circle"></i>
+          <h3>Order Confirmed! 🎂</h3>
+          <p id="success-msg">Thank you! A confirmation has been sent to your email.</p>
+          <p style="margin-top:0.8rem;font-size:0.85rem;opacity:0.7">Redirecting you home in a few seconds…</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3>Sweet Delights</h3>
+        <p>Bringing sweetness to your special moments.</p>
+      </div>
+      <div class="footer-section">
+        <h3>Quick Links</h3>
+        <a href="about.html">About Us</a>
+        <a href="index.html">Shop</a>
+      </div>
+      <div class="footer-section">
+        <h3>Contact Us</h3>
+        <p>Email: info@sweetdelights.com</p>
+        <p>Phone: (555) 123-4567</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 Sweet Delights. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- EmailJS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    /*
+    ┌─────────────────────────────────────────────────────────────────┐
+    │  HOW TO ENABLE EMAIL CONFIRMATIONS                              │
+    │                                                                 │
+    │  1. Sign up free at https://www.emailjs.com                     │
+    │  2. Create an Email Service (Gmail, Outlook, etc.)              │
+    │  3. Create an Email Template with these variables:              │
+    │       {{to_email}}  {{to_name}}  {{order_items}}                │
+    │       {{order_total}}  {{delivery_address}}  {{order_notes}}    │
+    │  4. Replace the three placeholders below with your real IDs     │
+    └─────────────────────────────────────────────────────────────────┘
+    */
+    const EMAILJS_PUBLIC_KEY   = 'YOUR_PUBLIC_KEY';   // ← replace
+    const EMAILJS_SERVICE_ID   = 'YOUR_SERVICE_ID';   // ← replace
+    const EMAILJS_TEMPLATE_ID  = 'YOUR_TEMPLATE_ID';  // ← replace
+
+    const emailjsConfigured = !EMAILJS_PUBLIC_KEY.startsWith('YOUR');
+
+    if (emailjsConfigured) {
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+    }
+
+    // ── Render order summary ───────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      const cart = getCart();
+
+      if (cart.length === 0) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      let subtotal = 0;
+      const linesHTML = cart.map(item => {
+        const t = item.price * item.quantity;
+        subtotal += t;
+        return `
+          <div class="order-item-line">
+            <span>${item.title} <span style="opacity:0.5">×${item.quantity}</span></span>
+            <span>$${t.toFixed(0)}</span>
+          </div>`;
+      }).join('');
+
+      const deliveryFee = subtotal > 100 ? 0 : 8;
+      const total = subtotal + deliveryFee;
+
+      document.getElementById('order-lines').innerHTML =
+        linesHTML +
+        `<div class="order-item-line" style="opacity:0.6;font-size:0.85rem">
+           <span>Delivery</span>
+           <span>${deliveryFee === 0 ? 'Free' : '$' + deliveryFee}</span>
+         </div>`;
+
+      document.getElementById('grand-total').textContent = `$${total.toFixed(0)}`;
+
+      if (deliveryFee === 0) {
+        document.getElementById('delivery-note').textContent = '✓ Free delivery applied';
+      }
+    });
+
+    // ── Place order ────────────────────────────────────────────────
+    window.placeOrder = async function () {
+      const firstName = document.getElementById('firstName').value.trim();
+      const lastName  = document.getElementById('lastName').value.trim();
+      const email     = document.getElementById('email').value.trim();
+      const address   = document.getElementById('address').value.trim();
+      const phone     = document.getElementById('phone').value.trim();
+      const notes     = document.getElementById('notes').value.trim();
+
+      if (!firstName || !lastName || !email || !address) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Please enter a valid email address.');
+        return;
+      }
+
+      const cart = getCart();
+      if (cart.length === 0) { window.location.href = 'index.html'; return; }
+
+      // Show loading
+      document.getElementById('form-area').style.display = 'none';
+      document.getElementById('loading-state').style.display = 'block';
+
+      let subtotal = 0;
+      const itemLines = cart.map(item => {
+        const t = item.price * item.quantity;
+        subtotal += t;
+        return `• ${item.title} ×${item.quantity} — $${t.toFixed(0)}`;
+      }).join('\n');
+      const deliveryFee = subtotal > 100 ? 0 : 8;
+      const total = subtotal + deliveryFee;
+
+      const orderRef = 'SD-' + Date.now().toString(36).toUpperCase();
+
+      const templateParams = {
+        to_email:        email,
+        to_name:         `${firstName} ${lastName}`,
+        order_ref:       orderRef,
+        order_items:     itemLines,
+        order_subtotal:  `$${subtotal.toFixed(0)}`,
+        delivery_fee:    deliveryFee === 0 ? 'Free' : `$${deliveryFee}`,
+        order_total:     `$${total.toFixed(0)}`,
+        delivery_address: address,
+        phone:           phone || 'Not provided',
+        order_notes:     notes || 'None',
+      };
+
+      // Send email if configured, otherwise simulate
+      try {
+        if (emailjsConfigured) {
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+        } else {
+          // Simulate a 1.5s delay when EmailJS isn't configured
+          await new Promise(r => setTimeout(r, 1500));
+          console.info('EmailJS not configured — order data:', templateParams);
+        }
+
+        // Clear cart
+        saveCart([]);
+        updateCartBadge();
+
+        // Show success
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('success-state').style.display = 'block';
+        document.getElementById('success-msg').textContent =
+          emailjsConfigured
+            ? `A confirmation has been sent to ${email}. Your order reference is ${orderRef}.`
+            : `Order ${orderRef} received! (Set up EmailJS to send real confirmation emails.)`;
+
+        setTimeout(() => window.location.href = 'index.html', 5000);
+
+      } catch (err) {
+        console.error('EmailJS error:', err);
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('form-area').style.display = 'block';
+        alert('There was a problem sending your confirmation email. Please try again or contact us directly.');
+      }
+    };
+  </script>
+</body>
+</html>
